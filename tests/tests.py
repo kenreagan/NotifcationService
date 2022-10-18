@@ -10,6 +10,9 @@ class TestNotification(unittest.TestCase):
         pass
 
 
+    def testMailSuggestion(self):
+        pass
+
     def testSendEmail(self):
         pass
 

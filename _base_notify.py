@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import os
 from io import BytesIO
-from exceptions import FileTooLargeError
+# from exceptions import FileTooLargeError
 import shutil
 from logger import logger
 
@@ -23,7 +23,7 @@ class BaseNotifier(ABC):
     def parse(self):
         pass
 
-    @abstractethod
+    @abstractmethod
     def send(self):
         pass
 
@@ -34,8 +34,8 @@ class BaseNotifier(ABC):
 
 class FileBaseClass:
     def __init__(self, owner=None, expiry_date=None, stream=None, filename=None):
-	self.stream: BytesIO = stream or BytesIO()
-	if filename is None:
+        self.stream: BytesIO = stream or BytesIO()
+        if filename is None:
             filename = getattr(stream, 'name', None)
             if filename is not None:
                 filename = os.fsdecode(filename)
