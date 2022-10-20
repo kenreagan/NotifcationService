@@ -2,23 +2,33 @@ from __future__ import annotations
 from email.message import EmailMessage
 import mimetypes
 from _base_notify import BaseNotifier
-from email.parser import Parser, BytesParser
-from email.policy import default
-from App.databasemanager import DatabaseContextManager
-from App.models import User, Task
+# from email.parser import Parser, BytesParser
+# from email.policy import default
 from logger import logger
 import os
 from collections.abc import MutableMapping
+from abc import ABC, abstractmethod
+from collections import UserList
+
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from App.databasemanager import DatabaseContextManager
+from App.models import User, Tasks
+import app
+
 # email_re = re.compile(r'([a-z]*)(\@gmail.com)')
 
 MAIN_SENDER_EMAIL = "lumulikenreagan@gmail.com" # replace with environment Variable
 
 
-class UserTask(UserList):
+class UserTask(MutableMapping):
     class SuggestionBase:
         def __init__(self, user, suggestion):
             self.user: User = user
-            self.suggestion: Task = suggestion
+            self.suggestion: Tasks = suggestion
 
     def __init__(self):
         self.suggestions = []
@@ -74,21 +84,23 @@ class UserTask(UserList):
 class MailTaskSuggestor:
     def __init__(self, user_id):
         self.user = user_id
-        mailed_tasks = UserTask()
+        self.mailed_tasks = UserTask()
 
 
-    def generate_task(self):
-        with DatabaseContextManager() as context_manager:
-            task = context_manager.session.query(Task).all()
-            user = context_manager.session.query(User).filter(
-                user_id = user_id        
-            ).first()
+    def generate_task(self) -> UserTask:
+        with app.app.app_context():
+            with DatabaseContextManager() as context_manager:
+                task = context_manager.session.query(Tasks).all()
+                user = context_manager.session.query(User).filter(
+                    User.id == self.user        
+                ).first()
             
-            if user:
-                if task:
-                    for tasks in task:
-                        mailed_tasks[user] = tasks
-        yield mailed_tasks
+                if user:
+                    if task:
+                        for tasks in task:
+                            if tasks.payment_status == "paid" and tasks.progress_status == "unclaimed":
+                                self.mailed_tasks[user] = tasks
+            yield self.mailed_tasks
 
 
 class BaseValidator(ABC):
@@ -115,16 +127,32 @@ class EmailValidators(BaseValidator):
         pass
 
 
+class MailBasket(UserList):
+    pass
+
+
 class EmailHeadersGenerators:
-    def __init__(self, recipient, task_id):
-       self.recipient= recipient
-       self.subject = self.generate_mail_body(recipient, task_id)
-    
-    def __repr__(self):
-        return f"From: KEN LUMULI <{MAIN_SENDER_EMAIL}>\n To: <{self.recipient}>"
-    
-    def generate_mail_body(self):
-        tasks = MailTaskSuggestor(recipient).generate_task()
+    def __init__(self):
+        self.basket = MailBasket()
+
+    def generate_headers(self) -> Iterable[EmailMessage]:
+        self.suggestions: Iterable[UserTask] = [MailTaskSuggestor(i).generate_task() for i in range(1, 2)]
+        for det in self.suggestions:
+            for idx in range(2):
+                message = EmailMessage()
+                message['Subject'] = suggestions[idx].suggestion.title
+                message['From'] = MAIN_SENDER_EMAIL
+                message['To'] = items.suggestions[idx].user.email
+                message.set_content(f"""
+                Hello {items.user.name} A task has been uploaded that meets your qualifications 
+                click the link below if you can handle it
+                http:://localhost:5000/user/task{items.suggestion.task_id}
+                """)
+                ## Append the Message to the global EMailHandler
+                ## Handle attachment incase required
+            
+                self.basket.append(message)
+        return self.basket
 
 
 class MailNotifier:
@@ -132,34 +160,30 @@ class MailNotifier:
 
 
 class MailHandler(BaseNotifier):
-    def __init__(self):
+    def __init__(self) -> None:
         """
         Send email messages to already subscribed users.
         """
+        self.messages = EmailHeadersGenerators().generate_headers()
 
-        super(self, BaseNotifier).__init__(*args, **kwargs)
-        self.headers = Parser(policy=default).parsestr(EmailHeadersGenerators(self.recepient))
-        print(dir(self.headers))
+    def send(self) -> None:
+        with smtplib.SMTP('localhost') as server:
+            for message in self.messages:
+                server.send(message)
+                self.messages.remove(message)
 
-
-    def parse(self):
-        self.from_addr = self.headers['from']
-        self.to_addr = self.headers['to']
-
-    def send(self):
+    def send_mail_with_attchment(self) -> None:
         with smtplib.SMTP('localhost') as server:
             server.send(self.headers)
 
-
-    def send_mail_with_attchment(self):
-        with smtplib.SMTP('localhost') as server:
-            server.send(self.headers)
-
-    def serve_forever(self):
-        logger.info("Preparing Server")
-        while True:
+    def serve_forever(self) -> None:
+        logger.info("Sending Messages ...")
+        while len(self.messages) > 0:
             self.send()
+        else:
+            logger.warning("No messages in queue")
+            return
 
 if __name__ == '__main__':
-    server = MailHandler()
-    server.serve_forever()
+    m = MailHandler()
+    m.serve_forever()

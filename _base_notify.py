@@ -20,10 +20,6 @@ class BaseNotifier(ABC):
         self.status: bool = False
     
     @abstractmethod
-    def parse(self):
-        pass
-
-    @abstractmethod
     def send(self):
         pass
 
