@@ -102,7 +102,7 @@ class MailTaskSuggestor:
                             self.mailed_tasks[user] = tasks
         return self.mailed_tasks
 
-
+# Validate email from database
 class BaseValidator(ABC):
     def __init__(self):
         self.det = None
@@ -123,10 +123,13 @@ class BaseValidator(ABC):
 
 
 class EmailValidators(BaseValidator):
-    def validate(self):
-        pass
+    def validate(self, email):
+        email_re = re.compile(r'[a-z0-9]*\@gmail\.com')
 
+        if not email_re.match(email):
+            raise ValueError
 
+# Replace it with message Queue <- utils.py
 class MailBasket(UserList):
     pass
 

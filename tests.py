@@ -1,5 +1,6 @@
 import unittest
-
+import os
+from _mail_handler import EmailValidators
 
 class TestNotification(unittest.TestCase):
     def setUp(self):
@@ -11,7 +12,7 @@ class TestNotification(unittest.TestCase):
 
 
     def testMailSuggestion(self):
-        pass
+        print(dir(self))
 
     def testSendEmail(self):
         pass
